@@ -1,5 +1,4 @@
 #include "primer/trie_store.h"
-#include <mutex>
 #include <optional>
 #include "common/exception.h"
 

@@ -12,10 +12,8 @@
 
 #include "buffer/lru_k_replacer.h"
 #include <cmath>
-#include <mutex>
 #include "common/exception.h"
 #include "common/macros.h"
-#include "googletest/googletest/src/gtest-internal-inl.h"
 
 namespace bustub {
 
