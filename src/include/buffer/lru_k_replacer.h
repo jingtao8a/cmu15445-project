@@ -32,8 +32,14 @@ class LRUKNode {
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
   auto operator<(const LRUKNode &rhs) const -> bool {
-    if (k_ == INFINITY && rhs.k_ == INFINITY) {
+    if (k_ == 0 && rhs.k_ == 0) {
       return history_.front() < rhs.history_.front();
+    }
+    if (k_ == 0) {
+      return true;
+    }
+    if (rhs.k_ == 0) {
+      return false;
     }
     return k_ > rhs.k_;
   }

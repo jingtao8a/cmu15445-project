@@ -22,7 +22,7 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k) {}
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
-  std::lock_guard<std::mutex> lock_guard(latch_);
+  std::lock_guard<std::mutex> guard(latch_);
   *frame_id = -1;
   for (auto &p : node_store_) {
     if (p.second.is_evictable_) {
@@ -32,7 +32,8 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     }
   }
   if (*frame_id != -1) {
-    Remove(*frame_id);
+    node_store_.erase(*frame_id);
+    --curr_size_;
     return true;
   }
   return false;
@@ -42,12 +43,13 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
   std::lock_guard<std::mutex> lock_guard(latch_);
   BUSTUB_ASSERT(frame_id < static_cast<int>(replacer_size_), "frame_id is larger than or equal to replacer_size_");
   if (node_store_.count(frame_id) == 0) {
+    node_store_[frame_id] = LRUKNode();
     node_store_[frame_id].fid_ = frame_id;
   }
   auto &node = node_store_[frame_id];
   node.history_.push_front(current_timestamp_++);
   if (node.history_.size() < k_) {
-    node.k_ = INFINITY;
+    node.k_ = 0;
     return;
   }
   while (node.history_.size() > k_) {
@@ -60,9 +62,9 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::lock_guard<std::mutex> lock_guard(latch_);
   BUSTUB_ASSERT(node_store_.count(frame_id) > 0, "frame_id should be used");
   if (!node_store_[frame_id].is_evictable_ && set_evictable) {
-    curr_size_--;
-  } else if (node_store_[frame_id].is_evictable_ && !set_evictable) {
     curr_size_++;
+  } else if (node_store_[frame_id].is_evictable_ && !set_evictable) {
+    curr_size_--;
   }
   node_store_[frame_id].is_evictable_ = set_evictable;
 }
