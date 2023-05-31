@@ -31,21 +31,7 @@ class LRUKNode {
  public:
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
-  auto operator<(const LRUKNode &rhs) const -> bool {
-    if (k_ == 0 && rhs.k_ == 0) {
-      return history_.front() < rhs.history_.front();
-    }
-    if (k_ == 0) {
-      return true;
-    }
-    if (rhs.k_ == 0) {
-      return false;
-    }
-    return k_ > rhs.k_;
-  }
-
   std::list<size_t> history_;
-  size_t k_;
   frame_id_t fid_;
   bool is_evictable_{false};
 };
@@ -163,6 +149,15 @@ class LRUKReplacer {
 
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
+  auto Judge(const LRUKNode &lhs, const LRUKNode &rhs) const -> bool {
+    if (rhs.history_.size() == k_ && lhs.history_.size() < k_) {
+      return true;
+    }
+    if (rhs.history_.size() < k_ && lhs.history_.size() == k_) {
+      return false;
+    }
+    return lhs.history_.back() < rhs.history_.back();
+  }
   // Remove maybe_unused if you start using them.
   std::unordered_map<frame_id_t, LRUKNode> node_store_;
   size_t current_timestamp_{0};

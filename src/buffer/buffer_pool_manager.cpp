@@ -13,6 +13,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include <cstddef>
 #include <cstdlib>
+#include <unordered_map>
 
 #include "common/config.h"
 #include "common/exception.h"
@@ -114,7 +115,7 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unus
   if (--pages_[frame_id].pin_count_ == 0) {
     replacer_->SetEvictable(frame_id, true);
   }
-  pages_[frame_id].is_dirty_ = is_dirty;
+  pages_[frame_id].is_dirty_ |= is_dirty;
   return true;
 }
 
@@ -130,8 +131,13 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
 }
 
 void BufferPoolManager::FlushAllPages() {
-  std::lock_guard<std::mutex> guard(latch_);
-  for (auto &p : page_table_) {
+  std::unordered_map<page_id_t, frame_id_t> back_page_table;
+  {
+    std::lock_guard<std::mutex> guard(latch_);
+    back_page_table = page_table_;
+  }
+
+  for (auto &p : back_page_table) {
     FlushPage(p.first);
   }
 }

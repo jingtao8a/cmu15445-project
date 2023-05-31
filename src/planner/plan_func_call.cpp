@@ -47,8 +47,9 @@ auto Planner::GetFuncCallFromFactory(const std::string &func_name, std::vector<A
   } else {
     throw Exception(fmt::format("func call {} not supported in planner yet", func_name));
   }
-  BUSTUB_ASSERT(args.size() == 1, "the number of args (should be 1)");
-
+  if (args.size() != 1) {
+    throw Exception("the number of args (should be 1)");
+  }
   return std::make_shared<StringExpression>(args.front(), type);
 }
 
