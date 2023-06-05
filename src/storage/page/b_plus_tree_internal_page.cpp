@@ -36,14 +36,25 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(int max_size, int size) {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const -> int {
+  for (int i = 0; i <= GetSize(); ++i) {
+    if (array_[i].second == value) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::LookUp(const KeyType &key, const KeyComparator &comparator) const -> ValueType {
-  for (int i = 1; i < GetSize(); ++i) {  //顺序查找
+  for (int i = 1; i < GetSize(); ++i) {  // 顺序查找
     if (comparator(key, array_[i].first) < 0) {
       return array_[i - 1].second;
     }
   }
   return array_[GetSize() - 1].second;
 }
+
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
     -> bool {

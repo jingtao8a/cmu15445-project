@@ -47,7 +47,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
    */
   void Init(int max_size = INTERNAL_PAGE_SIZE, int size = 1);
 
-  auto GetArray() -> MappingType * { return array_; }
+  auto GetArray() const -> MappingType * { return array_; }
 
   auto KeyAt(int index) const -> KeyType { return array_[index].first; }
 
@@ -56,6 +56,8 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto ValueAt(int index) const -> ValueType { return array_[index].second; }
 
   void SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
+
+  auto ValueIndex(const ValueType &value) const -> int;
 
   auto LookUp(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
 
@@ -88,6 +90,6 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
  private:
   // Flexible array member for page data.
-  MappingType array_[0];
+  mutable MappingType array_[0];
 };
 }  // namespace bustub

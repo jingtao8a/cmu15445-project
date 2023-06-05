@@ -53,10 +53,10 @@ class BPlusTreeLeafPage : public BPlusTreePage {
    * method to set default values
    * @param max_size Max size of the leaf node
    */
-  void Init(int max_size = LEAF_PAGE_SIZE, int size = 0, page_id_t next_page_id = 0);
+  void Init(int max_size = LEAF_PAGE_SIZE, int size = 0, page_id_t next_page_id = INVALID_PAGE_ID);
 
   // helper methods
-  auto GetArray() -> MappingType * { return array_; };
+  auto GetArray() const -> MappingType * { return array_; };
   auto GetNextPageId() const -> page_id_t { return next_page_id_; }
   void SetNextPageId(page_id_t next_page_id) { next_page_id_ = next_page_id; }
 
@@ -95,6 +95,6 @@ class BPlusTreeLeafPage : public BPlusTreePage {
  private:
   page_id_t next_page_id_;
   // Flexible array member for page data.
-  MappingType array_[0];
+  mutable MappingType array_[0];
 };
 }  // namespace bustub
