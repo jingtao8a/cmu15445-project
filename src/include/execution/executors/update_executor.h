@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "catalog/catalog.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/update_plan.h"
@@ -52,7 +53,7 @@ class UpdateExecutor : public AbstractExecutor {
    *
    * NOTE: UpdateExecutor::Next() does not use the `rid` out-parameter.
    */
-  auto Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool override;
+  auto Next(Tuple *tuple, RID *rid) -> bool override;
 
   /** @return The output schema for the update */
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
@@ -64,5 +65,9 @@ class UpdateExecutor : public AbstractExecutor {
   const TableInfo *table_info_;
   /** The child executor to obtain value from */
   std::unique_ptr<AbstractExecutor> child_executor_;
+
+  std::vector<IndexInfo *> index_infos_;
+
+  bool successful_;
 };
 }  // namespace bustub
