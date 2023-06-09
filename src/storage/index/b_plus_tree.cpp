@@ -420,7 +420,7 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
   auto header_page_guard = bpm_->FetchPageRead(header_page_id_);
   auto header_page = header_page_guard.As<BPlusTreeHeaderPage>();
   if (header_page->root_page_id_ == INVALID_PAGE_ID) {
-    throw Exception("BplusTree is empty");
+    return INDEXITERATOR_TYPE();
   }
   ctx.root_page_id_ = header_page->root_page_id_;
   ctx.read_set_.push_back(bpm_->FetchPageRead(ctx.root_page_id_));
@@ -448,7 +448,7 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   auto header_page_guard = bpm_->FetchPageRead(header_page_id_);
   auto header_page = header_page_guard.As<BPlusTreeHeaderPage>();
   if (header_page->root_page_id_ == INVALID_PAGE_ID) {
-    throw Exception("BplusTree is empty");
+    return INDEXITERATOR_TYPE();
   }
   ctx.root_page_id_ = header_page->root_page_id_;
   ctx.read_set_.push_back(bpm_->FetchPageRead(ctx.root_page_id_));

@@ -17,6 +17,7 @@
 #include <utility>
 #include "buffer/buffer_pool_manager.h"
 #include "common/config.h"
+#include "storage/index/index.h"
 #include "storage/page/b_plus_tree_leaf_page.h"
 #include "storage/page/page_guard.h"
 
@@ -33,6 +34,9 @@ class IndexIterator {
       : read_guard_(std::move(read_guard)), index_(0), bpm_(bpm) {}
   IndexIterator(BufferPoolManager *bpm, ReadPageGuard read_guard, int index)
       : read_guard_(std::move(read_guard)), index_(index), bpm_(bpm) {}
+
+  IndexIterator(const IndexIterator &) = default;
+  IndexIterator(IndexIterator &&) noexcept = default;
 
   ~IndexIterator();  // NOLINT
 
