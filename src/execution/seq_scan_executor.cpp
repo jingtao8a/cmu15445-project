@@ -46,7 +46,7 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     *tuple = std::move(pair.second);
     *rid = tuple->GetRid();
     return true;
-  };
+  }
   return false;
 }
 
