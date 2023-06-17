@@ -14,6 +14,7 @@
 
 #include "execution/executors/aggregation_executor.h"
 #include "execution/plans/aggregation_plan.h"
+#include "type/type_id.h"
 
 namespace bustub {
 
@@ -32,6 +33,10 @@ void AggregationExecutor::Init() {
     AggregateKey key = MakeAggregateKey(&tuple);
     AggregateValue value = MakeAggregateValue(&tuple);
     aht_.InsertCombine(key, value);
+  }
+  if (aht_.Begin() == aht_.End() && plan_->GetGroupBys().empty()) {  // hash表为空,
+    AggregateKey key;
+    aht_.Insert(key, aht_.GenerateInitialAggregateValue());
   }
   aht_iterator_ = std::make_unique<SimpleAggregationHashTable::Iterator>(aht_.Begin());
 }

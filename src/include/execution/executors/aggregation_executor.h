@@ -78,7 +78,7 @@ class SimpleAggregationHashTable {
           result->aggregates_[i] = {INTEGER, result->aggregates_[i].GetAs<int32_t>() + 1};
           break;
         case AggregationType::CountAggregate:
-          if (!input.aggregates_[i].IsNull()) {
+          if (input.aggregates_[i].IsNull()) {
             break;
           }
           if (result->aggregates_[i].IsNull()) {
@@ -88,7 +88,7 @@ class SimpleAggregationHashTable {
           }
           break;
         case AggregationType::SumAggregate:
-          if (!input.aggregates_[i].IsNull()) {
+          if (input.aggregates_[i].IsNull()) {
             break;
           }
           if (result->aggregates_[i].IsNull()) {
@@ -98,7 +98,7 @@ class SimpleAggregationHashTable {
           }
           break;
         case AggregationType::MinAggregate:
-          if (!input.aggregates_[i].IsNull()) {
+          if (input.aggregates_[i].IsNull()) {
             break;
           }
           if (result->aggregates_[i].IsNull()) {
@@ -108,7 +108,7 @@ class SimpleAggregationHashTable {
           }
           break;
         case AggregationType::MaxAggregate:
-          if (!input.aggregates_[i].IsNull()) {
+          if (input.aggregates_[i].IsNull()) {
             break;
           }
           if (result->aggregates_[i].IsNull()) {
@@ -132,6 +132,8 @@ class SimpleAggregationHashTable {
     }
     CombineAggregateValues(&ht_[agg_key], agg_val);
   }
+
+  void Insert(const AggregateKey &agg_key, const AggregateValue &agg_val) { ht_.insert({agg_key, agg_val}); }
 
   /**
    * Clear the hash table
