@@ -12,12 +12,16 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
+#include <queue>
 #include <utility>
 #include <vector>
 
+#include "binder/bound_order_by.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
+#include "execution/expressions/abstract_expression.h"
 #include "execution/plans/seq_scan_plan.h"
 #include "execution/plans/topn_plan.h"
 #include "storage/table/tuple.h"
@@ -63,5 +67,7 @@ class TopNExecutor : public AbstractExecutor {
   const TopNPlanNode *plan_;
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
+  std::priority_queue<HeapKeyType> heap_;
+  std::deque<Tuple> result_;
 };
 }  // namespace bustub

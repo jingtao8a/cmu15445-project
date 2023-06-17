@@ -50,7 +50,11 @@ class SortExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
+  auto TupleComparator(const Tuple &left, const Tuple &right) -> bool;
   /** The sort plan node to be executed */
   const SortPlanNode *plan_;
+  std::unique_ptr<AbstractExecutor> child_executor_;
+  std::vector<Tuple> result_;
+  int index_;
 };
 }  // namespace bustub
