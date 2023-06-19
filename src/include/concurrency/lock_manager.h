@@ -64,6 +64,11 @@ class LockManager {
 
   class LockRequestQueue {
    public:
+    ~LockRequestQueue() {
+      for (auto p : request_queue_) {
+        delete p;
+      }
+    }
     /** List of lock requests for the same resource (table or row) */
     std::list<LockRequest *> request_queue_;
     /** For notifying blocked transactions on this rid */
@@ -312,12 +317,6 @@ class LockManager {
  private:
   /** Spring 2023 */
   /* You are allowed to modify all functions below. */
-  auto UpgradeLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
-  auto UpgradeLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
-
-  void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue);
-
-  auto CheckAppropriateLockOnTable(Transaction *txn, const table_oid_t &oid, LockMode row_lock_mode) -> bool;
   auto FindCycle(txn_id_t source_txn, std::vector<txn_id_t> &path, std::unordered_set<txn_id_t> &on_path,
                  std::unordered_set<txn_id_t> &visited, txn_id_t *abort_txn_id) -> bool;
   void UnlockAll();
@@ -326,6 +325,8 @@ class LockManager {
   auto CanLockUpgrade(LockMode curr_lock_mode, LockMode requested_lock_mode) -> bool;
   auto CanTxnTakeLock(Transaction *txn, LockMode lock_mode, std::shared_ptr<LockRequestQueue> &lock_request_queue)
       -> bool;
+  auto CheckAppropriateLockOnTable(Transaction *txn, const table_oid_t &oid, LockMode row_lock_mode) -> bool;
+  auto CheckAllRowsUnLock(Transaction *txn, const table_oid_t &oid) -> bool;
 
   void AddIntoTxnTableLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid);
   void RemoveFromTxnTableLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid);
