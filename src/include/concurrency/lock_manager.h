@@ -352,8 +352,12 @@ class LockManager {
   std::thread *cycle_detection_thread_;
   /** Waits-for graph representation. */
   std::map<txn_id_t, std::set<txn_id_t>> waits_for_;
-  std::unordered_map<txn_id_t, int> node_value_;
-  std::vector<txn_id_t> route_;
+  // std::unordered_map<txn_id_t, int> node_value_;
+  // std::vector<txn_id_t> route_;
+  std::vector<txn_id_t> stk_;
+  std::unordered_map<txn_id_t, bool> in_stk_;
+  std::unordered_map<txn_id_t, bool> has_search_;
+  std::unordered_map<txn_id_t, std::shared_ptr<LockRequestQueue>> txn_wait_map_;
   std::mutex waits_for_latch_;
 };
 

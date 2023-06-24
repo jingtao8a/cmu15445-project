@@ -15,6 +15,9 @@
 
 #include "catalog/column.h"
 #include "common/config.h"
+#include "common/exception.h"
+#include "concurrency/lock_manager.h"
+#include "concurrency/transaction.h"
 #include "execution/executors/insert_executor.h"
 #include "type/type.h"
 #include "type/type_id.h"
@@ -31,6 +34,16 @@ void InsertExecutor::Init() {
   table_info_ = cata_log->GetTable(plan_->table_oid_);
   index_infos_ = cata_log->GetTableIndexes(table_info_->name_);
   successful_ = false;
+  auto txn = exec_ctx_->GetTransaction();
+  try {
+    auto res =
+        exec_ctx_->GetLockManager()->LockTable(txn, LockManager::LockMode::INTENTION_EXCLUSIVE, plan_->table_oid_);
+    if (!res) {
+      throw ExecutionException("InsertExecutor LockTable Failed");
+    }
+  } catch (TransactionAbortException &exception) {
+    throw ExecutionException("InsertExecutor LockTable Failed");
+  }
 }
 
 auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
@@ -48,9 +61,16 @@ auto InsertExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     if (tuple_rid == std::nullopt) {
       continue;
     }
+    auto twr = TableWriteRecord(table_info_->oid_, tuple_rid.value(), table_info_->table_.get());
+    twr.wtype_ = WType::INSERT;
+    exec_ctx_->GetTransaction()->GetWriteSet()->push_back(twr);
+
     for (auto index_info : index_infos_) {
       auto key = tuple->KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
       index_info->index_->InsertEntry(key, *tuple_rid, exec_ctx_->GetTransaction());
+      auto iwr = IndexWriteRecord(tuple_rid.value(), table_info_->oid_, WType::INSERT, key, index_info->index_oid_,
+                                  exec_ctx_->GetCatalog());
+      exec_ctx_->GetTransaction()->GetIndexWriteSet()->push_back(iwr);
     }
     ++count;
   }

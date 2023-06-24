@@ -85,7 +85,9 @@ class TransactionManager {
    */
   auto GetTransaction(txn_id_t txn_id) -> Transaction * {
     std::shared_lock<std::shared_mutex> l(txn_map_mutex_);
-    assert(txn_map_.find(txn_id) != txn_map_.end());
+    if (txn_map_.find(txn_id) == txn_map_.end()) {
+      return nullptr;
+    }
     auto *res = txn_map_[txn_id];
     assert(res != nullptr);
     return res;

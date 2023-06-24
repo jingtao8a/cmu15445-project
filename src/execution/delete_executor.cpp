@@ -13,6 +13,8 @@
 #include <memory>
 
 #include "common/config.h"
+#include "concurrency/transaction.h"
+#include "execution/executor_context.h"
 #include "execution/executors/delete_executor.h"
 #include "storage/table/tuple.h"
 
@@ -41,9 +43,18 @@ auto DeleteExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   auto count = 0;
   while (child_executor_->Next(tuple, rid)) {
     table_info_->table_->UpdateTupleMeta(tuple_meta, *rid);
+
+    auto twr = TableWriteRecord(table_info_->oid_, *rid, table_info_->table_.get());
+    twr.wtype_ = WType::DELETE;
+    exec_ctx_->GetTransaction()->GetWriteSet()->push_back(twr);
+
     for (auto index_info : index_infos_) {
       auto key = tuple->KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
       index_info->index_->DeleteEntry(key, *rid, exec_ctx_->GetTransaction());
+
+      auto iwr = IndexWriteRecord(*rid, table_info_->oid_, WType::DELETE, key, index_info->index_oid_,
+                                  exec_ctx_->GetCatalog());
+      exec_ctx_->GetTransaction()->GetIndexWriteSet()->push_back(iwr);
     }
     count++;
   }
