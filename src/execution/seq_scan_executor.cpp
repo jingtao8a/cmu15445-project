@@ -24,7 +24,7 @@ SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNod
 void SeqScanExecutor::Init() {
   auto catalog = exec_ctx_->GetCatalog();
   table_info_ = catalog->GetTable(plan_->table_oid_);
-  iterator_ = std::make_unique<TableIterator>(table_info_->table_->MakeIterator());
+  iterator_ = std::make_unique<TableIterator>(table_info_->table_->MakeEagerIterator());
 }
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {

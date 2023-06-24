@@ -307,7 +307,9 @@ void AbortTest1() {
   EXPECT_EQ(true, lock_mgr.UnlockRow(txn1, oid, rid));
   CheckTxnRowLockSize(txn1, oid, 0, 0);
 
+  LOG_DEBUG(" no aborted");
   txn2_task.join();
+  LOG_DEBUG("aborted");
   txn3_task.join();
   /** txn2 shouldn't have any row locks */
   CheckTxnRowLockSize(txn2, oid, 0, 0);

@@ -13,9 +13,9 @@
 #include "concurrency/lock_manager.h"
 #include <bits/types/stack_t.h>
 #include <memory>
-#include <mutex>
 
 #include "common/config.h"
+#include "common/logger.h"
 #include "common/macros.h"
 #include "concurrency/transaction.h"
 #include "concurrency/transaction_manager.h"
@@ -104,9 +104,9 @@ auto LockManager::LockTableDirectlyOrNot(Transaction *txn, LockMode lock_mode, c
 
   while (!CanTxnTakeLock(txn, lock_mode, lrq)) {
     lrq->cv_.wait(lock);
-    // 可能死锁检测将该事务ABORTED
+    // 可能死锁检测将该事务ABORTED 或者 手动ABORT该事务
     if (txn->GetState() == TransactionState::ABORTED) {
-      // 删除该事务的所有request
+      // 删除该事务对该资源的request
       for (auto iter = lrq->request_queue_.begin(); iter != lrq->request_queue_.end(); iter++) {
         auto lr = *iter;
         if (lr->txn_id_ == txn->GetTransactionId()) {
@@ -289,7 +289,7 @@ auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_
   std::unique_lock<std::mutex> lock(lrq->latch_);
   row_lock_map_latch_.unlock();
 
-  //检查是否是一次锁升级(S->X)
+  // 检查是否是一次锁升级(S->X)
   bool upgrade = false;
   for (auto iter = lrq->request_queue_.begin(); iter != lrq->request_queue_.end(); iter++) {
     auto lr = *iter;
@@ -320,7 +320,9 @@ auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_
 
   while (!CanTxnTakeLock(txn, lock_mode, lrq)) {
     lrq->cv_.wait(lock);
+    // 死锁检测ABORT该事务 或者 手动ABORT该事务
     if (txn->GetState() == TransactionState::ABORTED) {
+      // 移除该事务对该资源的request
       for (auto iter = lrq->request_queue_.begin(); iter != lrq->request_queue_.end(); iter++) {
         auto lr = *iter;
         if (lr->txn_id_ == txn->GetTransactionId()) {
@@ -469,21 +471,14 @@ void LockManager::RemoveAllAboutAbortTxn(txn_id_t abort_id) {
   table_lock_map_latch_.lock();
   for (auto &[k, v] : table_lock_map_) {
     v->latch_.lock();
-
     for (auto iter = v->request_queue_.begin(); iter != v->request_queue_.end();) {
       auto lr = *iter;
-      if (lr->txn_id_ == abort_id) {
-        v->request_queue_.erase(iter++);
-        if (lr->granted_) {
-          RemoveFromTxnTableLockSet(txn_manager_->GetTransaction(abort_id), lr->lock_mode_, lr->oid_);
-          v->cv_.notify_all();
-        }
-        delete lr;
-      } else {
-        iter++;
+      if (lr->txn_id_ == abort_id && !lr->granted_) {
+        v->cv_.notify_all();
+        break;
       }
+      iter++;
     }
-
     v->latch_.unlock();
   }
   table_lock_map_latch_.unlock();
@@ -491,19 +486,13 @@ void LockManager::RemoveAllAboutAbortTxn(txn_id_t abort_id) {
   row_lock_map_latch_.lock();
   for (auto &[k, v] : row_lock_map_) {
     v->latch_.lock();
-
     for (auto iter = v->request_queue_.begin(); iter != v->request_queue_.end();) {
       auto lr = *iter;
-      if (lr->txn_id_ == abort_id) {
-        v->request_queue_.erase(iter++);
-        if (lr->granted_) {
-          RemoveFromTxnRowLockSet(txn_manager_->GetTransaction(abort_id), lr->lock_mode_, lr->oid_, lr->rid_);
-          v->cv_.notify_all();
-        }
-        delete lr;
-      } else {
-        iter++;
+      if (lr->txn_id_ == abort_id && !lr->granted_) {
+        v->cv_.notify_all();
+        break;
       }
+      iter++;
     }
     v->latch_.unlock();
   }
