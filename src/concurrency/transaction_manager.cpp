@@ -12,6 +12,7 @@
 
 #include "concurrency/transaction_manager.h"
 
+#include <memory>
 #include <mutex>  // NOLINT
 #include <shared_mutex>
 #include <unordered_map>
@@ -28,9 +29,8 @@ void TransactionManager::Commit(Transaction *txn) {
   ReleaseLocks(txn);
 
   txn->SetState(TransactionState::COMMITTED);
-  txn_map_mutex_.lock();
+  std::unique_lock<std::shared_mutex> guard(txn_map_mutex_);
   txn_map_.erase(txn->GetTransactionId());
-  txn_map_mutex_.unlock();
 }
 
 void TransactionManager::Abort(Transaction *txn) {
@@ -62,9 +62,8 @@ void TransactionManager::Abort(Transaction *txn) {
   ReleaseLocks(txn);
 
   txn->SetState(TransactionState::ABORTED);
-  txn_map_mutex_.lock();
+  std::unique_lock<std::shared_mutex> guard(txn_map_mutex_);
   txn_map_.erase(txn->GetTransactionId());
-  txn_map_mutex_.unlock();
 }
 
 void TransactionManager::BlockAllTransactions() { UNIMPLEMENTED("block is not supported now!"); }

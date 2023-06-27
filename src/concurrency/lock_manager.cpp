@@ -124,6 +124,7 @@ auto LockManager::LockTableDirectlyOrNot(Transaction *txn, LockMode lock_mode, c
   }
 
   AddIntoTxnTableLockSet(txn, lock_mode, oid);
+  LOG_DEBUG("txn:%d LockTable %d lock_mode:%d", txn->GetTransactionId(), oid, lock_mode);
   return true;
 }
 
@@ -201,6 +202,7 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
         case IsolationLevel::REPEATABLE_READ:
           if (lr->lock_mode_ == LockMode::SHARED || lr->lock_mode_ == LockMode::EXCLUSIVE) {
             txn->SetState(TransactionState::SHRINKING);
+            LOG_DEBUG("txn:%d be set SHRINGKING", txn->GetTransactionId());
           }
           break;
         case IsolationLevel::READ_COMMITTED:
@@ -212,12 +214,14 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
         default:
           UNREACHABLE("wrong IsolationLevel");
       }
+
+      RemoveFromTxnTableLockSet(txn, lr->lock_mode_, oid);
+      LOG_DEBUG("txn:%d UnlockTable %d", txn->GetTransactionId(), oid);
+      lrq->request_queue_.erase(iter);
+      delete lr;
+      lrq->cv_.notify_all();
+      return true;
     }
-    RemoveFromTxnTableLockSet(txn, lr->lock_mode_, oid);
-    lrq->request_queue_.erase(iter);
-    delete lr;
-    lrq->cv_.notify_all();
-    return true;
   }
 
   ABORT_FOR_REASON_DIRECTLY_OR_NOT(AbortReason::ATTEMPTED_UNLOCK_BUT_NO_LOCK_HELD, true);
@@ -506,7 +510,8 @@ void LockManager::RunCycleDetection() {
         has_search_.clear();
         txn_id_t abort_tid;
         if (HasCycle(&abort_tid)) {
-          txn_manager_->GetTransaction(abort_tid)->SetState(TransactionState::ABORTED);
+          auto txn = txn_manager_->GetTransaction(abort_tid);
+          txn->SetState(TransactionState::ABORTED);
           RemoveAllAboutAbortTxn(abort_tid);
           txn_wait_map_[abort_tid]->cv_.notify_all();
         } else {
@@ -518,6 +523,7 @@ void LockManager::RunCycleDetection() {
 }
 
 void LockManager::AddIntoTxnTableLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) {
+  txn->LockTxn();
   if (lock_mode == LockMode::SHARED) {
     txn->GetSharedTableLockSet()->insert(oid);
   } else if (lock_mode == LockMode::EXCLUSIVE) {
@@ -529,9 +535,11 @@ void LockManager::AddIntoTxnTableLockSet(Transaction *txn, LockMode lock_mode, c
   } else if (lock_mode == LockMode::SHARED_INTENTION_EXCLUSIVE) {
     txn->GetSharedIntentionExclusiveTableLockSet()->insert(oid);
   }
+  txn->UnlockTxn();
 }
 
 void LockManager::RemoveFromTxnTableLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) {
+  txn->LockTxn();
   if (lock_mode == LockMode::SHARED) {
     txn->GetSharedTableLockSet()->erase(oid);
   } else if (lock_mode == LockMode::EXCLUSIVE) {
@@ -543,23 +551,28 @@ void LockManager::RemoveFromTxnTableLockSet(Transaction *txn, LockMode lock_mode
   } else if (lock_mode == LockMode::SHARED_INTENTION_EXCLUSIVE) {
     txn->GetSharedIntentionExclusiveTableLockSet()->erase(oid);
   }
+  txn->UnlockTxn();
 }
 
 void LockManager::AddIntoTxnRowLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) {
+  txn->LockTxn();
   if (lock_mode == LockMode::SHARED) {
     (*txn->GetSharedRowLockSet())[oid].insert(rid);
   } else if (lock_mode == LockMode::EXCLUSIVE) {
     (*txn->GetExclusiveRowLockSet())[oid].insert(rid);
   }
+  txn->UnlockTxn();
 }
 
 void LockManager::RemoveFromTxnRowLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid,
                                           const RID &rid) {
+  txn->LockTxn();
   if (lock_mode == LockMode::SHARED) {
     (*txn->GetSharedRowLockSet())[oid].erase(rid);
   } else if (lock_mode == LockMode::EXCLUSIVE) {
     (*txn->GetExclusiveRowLockSet())[oid].erase(rid);
   }
+  txn->UnlockTxn();
 }
 
 auto LockManager::AreLocksCompatible(LockMode mode1, LockMode mode2) -> bool {
