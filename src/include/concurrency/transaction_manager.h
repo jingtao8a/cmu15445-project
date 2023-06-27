@@ -45,6 +45,8 @@ class TransactionManager {
       -> Transaction * {
     if (txn == nullptr) {
       txn = new Transaction(next_txn_id_++, isolation_level);
+    } else {
+      txn->SetState(TransactionState::GROWING);
     }
 
     if (enable_logging) {
