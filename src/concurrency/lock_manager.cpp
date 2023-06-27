@@ -327,6 +327,8 @@ auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_
     }
   }
   AddIntoTxnRowLockSet(txn, lock_mode, oid, rid);
+  // LOG_DEBUG("txn:%d LockRow oid:%d rid:%d:%d lock_mode:%d", txn->GetTransactionId(), oid, rid.GetPageId(),
+  // rid.GetSlotNum(), lock_mode);
   return true;
 }
 
@@ -360,6 +362,7 @@ auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID 
           case IsolationLevel::REPEATABLE_READ:
             if (lr->lock_mode_ == LockMode::SHARED || lr->lock_mode_ == LockMode::EXCLUSIVE) {
               txn->SetState(TransactionState::SHRINKING);
+              // LOG_DEBUG("txn:%d be set SHRINGKING", txn->GetTransactionId());
             }
             break;
           case IsolationLevel::READ_COMMITTED:
@@ -373,6 +376,8 @@ auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID 
         }
       }
       RemoveFromTxnRowLockSet(txn, lr->lock_mode_, oid, rid);
+      // LOG_DEBUG("txn:%d UnlockRow oid:%d rid:%d:%d", txn->GetTransactionId(), oid, rid.GetPageId(),
+      // rid.GetSlotNum());
       lrq->request_queue_.erase(iter);
       delete lr;
       lrq->cv_.notify_all();
@@ -497,19 +502,30 @@ void LockManager::RemoveAllAboutAbortTxn(txn_id_t abort_id) {
   }
 }
 
+void LockManager::PrintGraph() {
+  for (auto &[k, v] : waits_for_) {
+    std::cout << k << "-> ";
+    for (auto x : v) {
+      std::cout << x;
+    }
+    std::cout << std::endl;
+  }
+}
+
 void LockManager::RunCycleDetection() {
   while (enable_cycle_detection_) {
     std::this_thread::sleep_for(cycle_detection_interval);
     {
       waits_for_.clear();
       BuildGraph();
-
+      // PrintGraph();
       while (true) {
         stk_.clear();
         in_stk_.clear();
         has_search_.clear();
         txn_id_t abort_tid;
         if (HasCycle(&abort_tid)) {
+          // LOG_DEBUG("abort_tid:%d", abort_tid);
           auto txn = txn_manager_->GetTransaction(abort_tid);
           txn->SetState(TransactionState::ABORTED);
           RemoveAllAboutAbortTxn(abort_tid);

@@ -19,6 +19,7 @@
 #include "execution/executor_context.h"
 #include "storage/table/table_iterator.h"
 #include "storage/table/tuple.h"
+#include "type/value_factory.h"
 
 namespace bustub {
 
@@ -32,11 +33,13 @@ void SeqScanExecutor::Init() {
   auto iso_level = txn->GetIsolationLevel();
   try {
     if (exec_ctx_->IsDelete()) {
-      auto res = exec_ctx_->GetLockManager()->LockTable(txn, LockManager::LockMode::EXCLUSIVE, plan_->table_oid_);
+      auto res =
+          exec_ctx_->GetLockManager()->LockTable(txn, LockManager::LockMode::INTENTION_EXCLUSIVE, plan_->table_oid_);
       if (!res) {
         throw ExecutionException("SeqScanExecutor LockTable Failed");
       }
-    } else if (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ) {
+    } else if (!txn->IsTableIntentionExclusiveLocked(plan_->table_oid_) &&  // 避免反向升级
+               (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ)) {
       auto res =
           exec_ctx_->GetLockManager()->LockTable(txn, LockManager::LockMode::INTENTION_SHARED, plan_->table_oid_);
       if (!res) {
@@ -62,7 +65,8 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
         if (!res) {
           throw ExecutionException("SeqScanExecutor LockRow Failed");
         }
-      } else if (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ) {
+      } else if (!txn->IsRowExclusiveLocked(plan_->table_oid_, pair.second.GetRid()) &&  // 避免反向升级
+                 (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ)) {
         auto res = exec_ctx_->GetLockManager()->LockRow(txn, LockManager::LockMode::SHARED, plan_->table_oid_,
                                                         pair.second.GetRid());
         if (!res) {
@@ -73,7 +77,9 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
       throw ExecutionException("SeqScanExecutor LockRow Failed");
     }
 
-    if (pair.first.is_deleted_) {
+    if (pair.first.is_deleted_ || (plan_->filter_predicate_ &&
+                                   plan_->filter_predicate_->Evaluate(&pair.second, table_info_->schema_)
+                                           .CompareEquals(ValueFactory::GetBooleanValue(false)) == CmpBool::CmpTrue)) {
       if (!exec_ctx_->IsDelete() &&
           (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ)) {
         try {
@@ -87,24 +93,6 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
       }
       ++(*iterator_);
       continue;
-    }
-    if (plan_->filter_predicate_) {
-      auto res = plan_->filter_predicate_->Evaluate(&pair.second, table_info_->schema_);
-      if (!(!res.IsNull() && res.GetAs<bool>())) {
-        if (!exec_ctx_->IsDelete() &&
-            (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ)) {
-          try {
-            auto res = exec_ctx_->GetLockManager()->UnlockRow(txn, plan_->table_oid_, pair.second.GetRid(), true);
-            if (!res) {
-              throw ExecutionException("SeqScanExecutor Force UnLockRow Failed");
-            }
-          } catch (TransactionAbortException &exception) {
-            throw ExecutionException("SeqScanExecutor Force UnLockRow Failed");
-          }
-        }
-        ++(*iterator_);
-        continue;
-      }
     }
 
     if (!exec_ctx_->IsDelete() && iso_level == IsolationLevel::READ_COMMITTED) {
