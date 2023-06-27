@@ -24,7 +24,7 @@
 
 #define ABORT_FOR_REASON_DIRECTLY_OR_NOT(X, directly)            \
   do {                                                           \
-    if (!directly) {                                             \
+    if (!(directly)) {                                           \
       return false;                                              \
     }                                                            \
     txn->SetState(TransactionState::ABORTED);                    \
@@ -124,7 +124,7 @@ auto LockManager::LockTableDirectlyOrNot(Transaction *txn, LockMode lock_mode, c
   }
 
   AddIntoTxnTableLockSet(txn, lock_mode, oid);
-  LOG_DEBUG("txn:%d LockTable %d lock_mode:%d", txn->GetTransactionId(), oid, lock_mode);
+  // LOG_DEBUG("txn:%d LockTable %d lock_mode:%d", txn->GetTransactionId(), oid, lock_mode);
   return true;
 }
 
@@ -202,7 +202,7 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
         case IsolationLevel::REPEATABLE_READ:
           if (lr->lock_mode_ == LockMode::SHARED || lr->lock_mode_ == LockMode::EXCLUSIVE) {
             txn->SetState(TransactionState::SHRINKING);
-            LOG_DEBUG("txn:%d be set SHRINGKING", txn->GetTransactionId());
+            // LOG_DEBUG("txn:%d be set SHRINGKING", txn->GetTransactionId());
           }
           break;
         case IsolationLevel::READ_COMMITTED:
@@ -216,7 +216,7 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
       }
 
       RemoveFromTxnTableLockSet(txn, lr->lock_mode_, oid);
-      LOG_DEBUG("txn:%d UnlockTable %d", txn->GetTransactionId(), oid);
+      // LOG_DEBUG("txn:%d UnlockTable %d", txn->GetTransactionId(), oid);
       lrq->request_queue_.erase(iter);
       delete lr;
       lrq->cv_.notify_all();
@@ -413,13 +413,15 @@ auto LockManager::DFS(txn_id_t txn_id) -> bool {
 }
 
 auto LockManager::HasCycle(txn_id_t *txn_id) -> bool {
-  for (auto &[k, v] : waits_for_) {
-    if (!has_search_[k] && DFS(k)) {
-      *txn_id = stk_.back();
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(waits_for_.begin(), waits_for_.end(),
+                     [this, txn_id](const std::pair<txn_id_t, std::set<txn_id_t>> &p) {
+                       auto k = p.first;
+                       if (!this->has_search_[k] && DFS(k)) {
+                         *txn_id = this->stk_.back();
+                         return true;
+                       }
+                       return false;
+                     });
 }
 
 auto LockManager::GetEdgeList() -> std::vector<std::pair<txn_id_t, txn_id_t>> {
