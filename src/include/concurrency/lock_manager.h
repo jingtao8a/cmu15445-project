@@ -339,6 +339,7 @@ class LockManager {
   void RemoveFromTxnRowLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid);
   auto AreLocksCompatible(LockMode mode1, LockMode mode2) -> bool;
   void PrintGraph();
+  void WakeAbortedTxn(txn_id_t abort_id);
   /** Structure that holds lock requests for a given table oid */
   std::unordered_map<table_oid_t, std::shared_ptr<LockRequestQueue>> table_lock_map_;
   /** Coordination */
@@ -358,7 +359,6 @@ class LockManager {
   std::vector<txn_id_t> stk_;
   std::unordered_map<txn_id_t, bool> in_stk_;
   std::unordered_map<txn_id_t, bool> has_search_;
-  std::unordered_map<txn_id_t, std::shared_ptr<LockRequestQueue>> txn_wait_map_;
   std::mutex waits_for_latch_;
 };
 

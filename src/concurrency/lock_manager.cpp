@@ -74,7 +74,6 @@ auto LockManager::LockTableDirectlyOrNot(Transaction *txn, LockMode lock_mode, c
   }
   auto lrq = table_lock_map_[oid];
   std::unique_lock<std::mutex> lock(lrq->latch_);
-  txn_wait_map_[txn->GetTransactionId()] = lrq;
   table_lock_map_latch_.unlock();
 
   // 检查此锁的请求是否为一次锁升级
@@ -190,6 +189,10 @@ auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool 
   }
 
   table_lock_map_latch_.lock();
+  if (table_lock_map_.count(oid) == 0) {
+    table_lock_map_latch_.unlock();
+    ABORT_FOR_REASON_DIRECTLY_OR_NOT(AbortReason::ATTEMPTED_UNLOCK_BUT_NO_LOCK_HELD, true);
+  }
   auto lrq = table_lock_map_[oid];
   std::unique_lock<std::mutex> lock(lrq->latch_);
   table_lock_map_latch_.unlock();
@@ -277,7 +280,6 @@ auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_
   }
   auto lrq = row_lock_map_[rid];
   std::unique_lock<std::mutex> lock(lrq->latch_);
-  txn_wait_map_[txn->GetTransactionId()] = lrq;
   row_lock_map_latch_.unlock();
 
   // 检查是否是一次锁升级(S->X)
@@ -311,8 +313,10 @@ auto LockManager::LockRow(Transaction *txn, LockMode lock_mode, const table_oid_
 
   while (!CanTxnTakeLock(txn, lock_mode, lrq)) {
     lrq->cv_.wait(lock);
+    // LOG_DEBUG("txn:%d wake", txn->GetTransactionId());
     // 死锁检测ABORT该事务 或者 手动ABORT该事务
     if (txn->GetState() == TransactionState::ABORTED) {
+      // LOG_DEBUG("txn:%d ABORT", txn->GetTransactionId());
       // 移除该事务对该资源的request
       for (auto iter = lrq->request_queue_.begin(); iter != lrq->request_queue_.end(); iter++) {
         auto lr = *iter;
@@ -349,6 +353,10 @@ auto LockManager::CheckAppropriateLockOnTable(Transaction *txn, const table_oid_
 
 auto LockManager::UnlockRow(Transaction *txn, const table_oid_t &oid, const RID &rid, bool force) -> bool {
   row_lock_map_latch_.lock();
+  if (row_lock_map_.count(rid) == 0) {
+    row_lock_map_latch_.unlock();
+    ABORT_FOR_REASON_DIRECTLY_OR_NOT(AbortReason::ATTEMPTED_UNLOCK_BUT_NO_LOCK_HELD, true);
+  }
   auto lrq = row_lock_map_[rid];
   std::unique_lock<std::mutex> lock(lrq->latch_);
   row_lock_map_latch_.unlock();
@@ -514,6 +522,33 @@ void LockManager::PrintGraph() {
   }
 }
 
+void LockManager::WakeAbortedTxn(txn_id_t abort_id) {
+  bool find = false;
+  table_lock_map_latch_.lock();
+  row_lock_map_latch_.lock();
+  for (auto &[k, v] : table_lock_map_) {
+    for (auto lr : v->request_queue_) {
+      if (lr->txn_id_ == abort_id && !lr->granted_) {
+        v->cv_.notify_all();
+        find = true;
+        break;
+      }
+    }
+  }
+  if (!find) {
+    for (auto &[k, v] : row_lock_map_) {
+      for (auto lr : v->request_queue_) {
+        if (lr->txn_id_ == abort_id && !lr->granted_) {
+          v->cv_.notify_all();
+          break;
+        }
+      }
+    }
+  }
+  table_lock_map_latch_.unlock();
+  row_lock_map_latch_.unlock();
+}
+
 void LockManager::RunCycleDetection() {
   while (enable_cycle_detection_) {
     std::this_thread::sleep_for(cycle_detection_interval);
@@ -531,7 +566,8 @@ void LockManager::RunCycleDetection() {
           auto txn = txn_manager_->GetTransaction(abort_tid);
           txn->SetState(TransactionState::ABORTED);
           RemoveAllAboutAbortTxn(abort_tid);
-          txn_wait_map_[abort_tid]->cv_.notify_all();
+          WakeAbortedTxn(abort_tid);
+          // LOG_DEBUG("dead_detect notify all");
         } else {
           break;
         }
