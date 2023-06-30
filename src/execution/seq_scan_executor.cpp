@@ -13,7 +13,6 @@
 #include "execution/executors/seq_scan_executor.h"
 #include <memory>
 #include <sstream>
-#include <thread>
 #include <type_traits>
 #include "common/exception.h"
 #include "common/logger.h"

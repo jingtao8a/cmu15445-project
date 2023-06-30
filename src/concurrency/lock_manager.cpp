@@ -411,7 +411,7 @@ auto LockManager::DFS(txn_id_t txn_id) -> bool {
     if (!has_search_[id]) {
       return DFS(id);
     }
-    if (in_stk_[txn_id]) {
+    if (in_stk_[id]) {
       return true;
     }
   }
@@ -428,6 +428,8 @@ auto LockManager::HasCycle(txn_id_t *txn_id) -> bool {
                          *txn_id = this->stk_.back();
                          return true;
                        }
+                       this->stk_.clear();
+                       this->in_stk_.clear();
                        return false;
                      });
 }
