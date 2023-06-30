@@ -12,8 +12,11 @@
 
 #include "execution/executors/seq_scan_executor.h"
 #include <memory>
+#include <sstream>
+#include <thread>
 #include <type_traits>
 #include "common/exception.h"
+#include "common/logger.h"
 #include "concurrency/lock_manager.h"
 #include "concurrency/transaction.h"
 #include "execution/executor_context.h"
@@ -77,10 +80,11 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
       throw ExecutionException("SeqScanExecutor LockRow Failed");
     }
 
-    if (pair.first.is_deleted_ || (plan_->filter_predicate_ &&
-                                   plan_->filter_predicate_->Evaluate(&pair.second, table_info_->schema_)
-                                           .CompareEquals(ValueFactory::GetBooleanValue(false)) == CmpBool::CmpTrue)) {
-      if (!exec_ctx_->IsDelete() &&
+    if (iterator_->GetTuple().first.is_deleted_ ||
+        (plan_->filter_predicate_ &&
+         plan_->filter_predicate_->Evaluate(&pair.second, table_info_->schema_)
+                 .CompareEquals(ValueFactory::GetBooleanValue(false)) == CmpBool::CmpTrue)) {
+      if (exec_ctx_->IsDelete() ||
           (iso_level == IsolationLevel::READ_COMMITTED || iso_level == IsolationLevel::REPEATABLE_READ)) {
         try {
           auto res = exec_ctx_->GetLockManager()->UnlockRow(txn, plan_->table_oid_, pair.second.GetRid(), true);
