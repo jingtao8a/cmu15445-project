@@ -412,6 +412,7 @@ auto LockManager::DFS(txn_id_t txn_id) -> bool {
       return DFS(id);
     }
     if (in_stk_[id]) {
+      stk_.push_back(id);
       return true;
     }
   }
@@ -425,7 +426,17 @@ auto LockManager::HasCycle(txn_id_t *txn_id) -> bool {
                      [this, txn_id](const std::pair<txn_id_t, std::set<txn_id_t>> &p) {
                        auto k = p.first;
                        if (!this->has_search_[k] && DFS(k)) {
-                         *txn_id = this->stk_.back();
+                         auto iter = std::find(this->stk_.begin(), this->stk_.end() - 1, this->stk_.back());
+                         *txn_id = -1;
+                         while (iter != this->stk_.end()) {
+                           if (*iter > *txn_id) {
+                             *txn_id = *iter;
+                           }
+                           ++iter;
+                         }
+                         this->stk_.clear();
+                         this->in_stk_.clear();
+                         this->has_search_.clear();
                          return true;
                        }
                        this->stk_.clear();

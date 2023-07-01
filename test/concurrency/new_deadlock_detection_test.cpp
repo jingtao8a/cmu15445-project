@@ -224,4 +224,54 @@ TEST(LockManagerDeadlockDetectionTest, CycleTest1) {
   lock_mgr.RemoveEdge(4, 2);
 }
 
+TEST(LockManagerDeadlockDetectionTest, CycleTest2) {
+  LockManager lock_mgr{};
+  lock_mgr.AddEdge(0, 1);
+  lock_mgr.AddEdge(1, 2);
+  lock_mgr.AddEdge(2, 3);
+  lock_mgr.AddEdge(3, 1);
+  lock_mgr.AddEdge(4, 3);
+  lock_mgr.AddEdge(5, 3);
+  lock_mgr.AddEdge(6, 3);
+  lock_mgr.AddEdge(7, 8);
+  lock_mgr.AddEdge(8, 9);
+  lock_mgr.AddEdge(9, 7);
+  txn_id_t txn_id;
+  lock_mgr.HasCycle(&txn_id);
+  EXPECT_EQ(3, txn_id);
+  lock_mgr.RemoveEdge(3, 1);
+  lock_mgr.RemoveEdge(4, 3);
+  lock_mgr.RemoveEdge(5, 3);
+  lock_mgr.RemoveEdge(6, 3);
+  lock_mgr.HasCycle(&txn_id);
+  EXPECT_EQ(9, txn_id);
+  lock_mgr.RemoveEdge(8, 9);
+  EXPECT_EQ(false, lock_mgr.HasCycle(&txn_id));
+}
+
+TEST(LockManagerDeadlockDetectionTest, CycleTest3) {
+  LockManager lock_mgr{};
+  lock_mgr.AddEdge(0, 1);
+  lock_mgr.AddEdge(1, 2);
+  lock_mgr.AddEdge(2, 3);
+  lock_mgr.AddEdge(3, 4);
+  lock_mgr.AddEdge(4, 5);
+  lock_mgr.AddEdge(5, 1);
+  lock_mgr.AddEdge(6, 1);
+  lock_mgr.AddEdge(7, 6);
+  lock_mgr.AddEdge(8, 7);
+  lock_mgr.AddEdge(9, 10);
+  lock_mgr.AddEdge(10, 11);
+  lock_mgr.AddEdge(11, 9);
+  txn_id_t txn_id;
+  EXPECT_EQ(true, lock_mgr.HasCycle(&txn_id));
+  EXPECT_EQ(5, txn_id);
+  lock_mgr.RemoveEdge(5, 1);
+  lock_mgr.RemoveEdge(4, 5);
+  EXPECT_EQ(true, lock_mgr.HasCycle(&txn_id));
+  EXPECT_EQ(11, txn_id);
+  lock_mgr.RemoveEdge(11, 9);
+  lock_mgr.RemoveEdge(10, 11);
+  EXPECT_EQ(false, lock_mgr.HasCycle(&txn_id));
+}
 }  // namespace bustub

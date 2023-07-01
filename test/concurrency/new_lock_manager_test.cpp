@@ -5,7 +5,7 @@
 #include "concurrency/lock_manager.h"
 
 #include <chrono>  // NOLINT
-#include <random>
+#include <random>  // NOLINT
 #include <thread>  // NOLINT
 
 #include "common/bustub_instance.h"
