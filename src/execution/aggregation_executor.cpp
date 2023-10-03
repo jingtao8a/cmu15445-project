@@ -13,16 +13,45 @@
 #include <vector>
 
 #include "execution/executors/aggregation_executor.h"
+#include "execution/plans/aggregation_plan.h"
+#include "type/type_id.h"
 
 namespace bustub {
 
 AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const AggregationPlanNode *plan,
                                          std::unique_ptr<AbstractExecutor> &&child)
-    : AbstractExecutor(exec_ctx) {}
+    : AbstractExecutor(exec_ctx),
+      plan_(plan),
+      child_(std::move(child)),
+      aht_(plan->GetAggregates(), plan->GetAggregateTypes()) {}
 
-void AggregationExecutor::Init() {}
+void AggregationExecutor::Init() {
+  child_->Init();
+  Tuple tuple;
+  RID rid;
+  while (child_->Next(&tuple, &rid)) {
+    AggregateKey key = MakeAggregateKey(&tuple);
+    AggregateValue value = MakeAggregateValue(&tuple);
+    aht_.InsertCombine(key, value);
+  }
+  if (aht_.Begin() == aht_.End() && plan_->GetGroupBys().empty()) {  // hash表为空,
+    AggregateKey key;
+    aht_.Insert(key, aht_.GenerateInitialAggregateValue());
+  }
+  aht_iterator_ = std::make_unique<SimpleAggregationHashTable::Iterator>(aht_.Begin());
+}
 
-auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool { return false; }
+auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+  if ((*aht_iterator_) == aht_.End()) {
+    return false;
+  }
+  auto key = aht_iterator_->Key();
+  auto value = aht_iterator_->Val();
+  ++(*aht_iterator_);
+  key.group_bys_.insert(key.group_bys_.end(), value.aggregates_.begin(), value.aggregates_.end());
+  *tuple = {key.group_bys_, &GetOutputSchema()};
+  return true;
+}
 
 auto AggregationExecutor::GetChildExecutor() const -> const AbstractExecutor * { return child_.get(); }
 

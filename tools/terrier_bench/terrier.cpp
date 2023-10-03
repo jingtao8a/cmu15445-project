@@ -239,7 +239,7 @@ auto main(int argc, char **argv) -> int {
   std::vector<std::thread> threads;
   TerrierTotalMetrics total_metrics;
 
-  bool verbose = false;
+  bool verbose = true;
 
   total_metrics.Begin();
 

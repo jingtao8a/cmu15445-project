@@ -26,26 +26,50 @@ namespace bustub {
  * Including set page type, set current size to zero, set next page id and set max size
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(int max_size) {}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(int max_size, int size, page_id_t next_page_id) {
+  SetPageType(IndexPageType::LEAF_PAGE);
+  SetMaxSize(max_size);
+  SetSize(size);
+  SetNextPageId(next_page_id);
+}
 
-/**
- * Helper methods to set/get next page id
- */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const -> page_id_t { return INVALID_PAGE_ID; }
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator, int &index) const
+    -> bool {
+  // lower_bound
+  int l = 0;
+  int r = GetSize();
+  if (l >= r) {
+    return false;
+  }
+  while (l < r) {
+    int mid = (l + r) / 2;
+    if (comparator(array_[mid].first, key) < 0) {
+      l = mid + 1;
+    } else {
+      r = mid;
+    }
+  }
+  index = l;
+  return static_cast<bool>(l != GetSize() && comparator(KeyAt(l), key) == 0);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {}
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
+    -> bool {
+  int pos = -1;
+  if (KeyIndex(key, comparator, pos)) {  // duplicate key
+    return false;
+  }
 
-/*
- * Helper method to find and return the key associated with input "index"(a.k.a
- * array offset)
- */
-INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
-  // replace with your own code
-  KeyType key{};
-  return key;
+  // move
+  for (int i = GetSize() - 1; i >= pos; --i) {
+    array_[i + 1] = array_[i];
+  }
+  // insert
+  array_[pos] = {key, value};
+  IncreaseSize(1);
+  return true;
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;

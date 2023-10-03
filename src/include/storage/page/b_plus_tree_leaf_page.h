@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/config.h"
 #include "storage/page/b_plus_tree_page.h"
 
 namespace bustub {
@@ -52,13 +53,20 @@ class BPlusTreeLeafPage : public BPlusTreePage {
    * method to set default values
    * @param max_size Max size of the leaf node
    */
-  void Init(int max_size = LEAF_PAGE_SIZE);
+  void Init(int max_size = LEAF_PAGE_SIZE, int size = 0, page_id_t next_page_id = INVALID_PAGE_ID);
 
   // helper methods
-  auto GetNextPageId() const -> page_id_t;
-  void SetNextPageId(page_id_t next_page_id);
-  auto KeyAt(int index) const -> KeyType;
+  auto GetArray() const -> MappingType * { return array_; };
+  auto GetNextPageId() const -> page_id_t { return next_page_id_; }
+  void SetNextPageId(page_id_t next_page_id) { next_page_id_ = next_page_id; }
 
+  auto KeyAt(int index) const -> KeyType { return array_[index].first; }
+  void SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
+  auto ValueAt(int index) const -> ValueType { return array_[index].second; }
+  void SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
+
+  auto KeyIndex(const KeyType &key, const KeyComparator &comparator, int &index) const -> bool;
+  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
   /**
    * @brief for test only return a string representing all keys in
    * this leaf page formatted as "(key1,key2,key3,...)"
@@ -87,6 +95,6 @@ class BPlusTreeLeafPage : public BPlusTreePage {
  private:
   page_id_t next_page_id_;
   // Flexible array member for page data.
-  MappingType array_[0];
+  mutable MappingType array_[0];
 };
 }  // namespace bustub

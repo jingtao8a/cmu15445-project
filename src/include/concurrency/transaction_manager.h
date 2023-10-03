@@ -45,6 +45,8 @@ class TransactionManager {
       -> Transaction * {
     if (txn == nullptr) {
       txn = new Transaction(next_txn_id_++, isolation_level);
+    } else {
+      txn->SetState(TransactionState::GROWING);
     }
 
     if (enable_logging) {
@@ -85,7 +87,9 @@ class TransactionManager {
    */
   auto GetTransaction(txn_id_t txn_id) -> Transaction * {
     std::shared_lock<std::shared_mutex> l(txn_map_mutex_);
-    assert(txn_map_.find(txn_id) != txn_map_.end());
+    if (txn_map_.find(txn_id) == txn_map_.end()) {
+      return nullptr;
+    }
     auto *res = txn_map_[txn_id];
     assert(res != nullptr);
     return res;
@@ -149,8 +153,8 @@ class TransactionManager {
   }
 
   std::atomic<txn_id_t> next_txn_id_{0};
-  LockManager *lock_manager_ __attribute__((__unused__));
-  LogManager *log_manager_ __attribute__((__unused__));
+  LockManager *lock_manager_;
+  LogManager *log_manager_;
 };
 
 }  // namespace bustub

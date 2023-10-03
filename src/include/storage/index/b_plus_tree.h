@@ -26,6 +26,7 @@
 #include "storage/page/b_plus_tree_header_page.h"
 #include "storage/page/b_plus_tree_internal_page.h"
 #include "storage/page/b_plus_tree_leaf_page.h"
+#include "storage/page/b_plus_tree_page.h"
 #include "storage/page/page_guard.h"
 
 namespace bustub {
@@ -54,6 +55,16 @@ class Context {
   std::deque<ReadPageGuard> read_set_;
 
   auto IsRootPage(page_id_t page_id) -> bool { return page_id == root_page_id_; }
+
+  void Drop() {
+    header_page_ = std::nullopt;
+    while (!write_set_.empty()) {
+      write_set_.pop_front();
+    }
+    while (!read_set_.empty()) {
+      read_set_.pop_front();
+    }
+  }
 };
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
@@ -63,6 +74,11 @@ INDEX_TEMPLATE_ARGUMENTS
 class BPlusTree {
   using InternalPage = BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+  enum class Operation { Search, Insert, Remove };
+
+ private:
+  auto FindLeafPage(const KeyType &key, Operation op, Context &ctx);
+  auto IsSafePage(const BPlusTreePage *tree_page, Operation op, bool isRootPage = false) -> bool;
 
  public:
   explicit BPlusTree(std::string name, page_id_t header_page_id, BufferPoolManager *buffer_pool_manager,
@@ -75,14 +91,16 @@ class BPlusTree {
   // Insert a key-value pair into this B+ tree.
   auto Insert(const KeyType &key, const ValueType &value, Transaction *txn = nullptr) -> bool;
 
+  void InsertIntoParent(const KeyType &key, page_id_t right_child_id, Context &ctx, int index);
   // Remove a key and its value from this B+ tree.
   void Remove(const KeyType &key, Transaction *txn);
 
+  void RemoveFromParent(int valueIndex, Context &ctx, int index);
   // Return the value associated with a given key
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *txn = nullptr) -> bool;
 
   // Return the page id of the root node
-  auto GetRootPageId() -> page_id_t;
+  auto GetRootPageId() const -> page_id_t;
 
   // Index iterator
   auto Begin() -> INDEXITERATOR_TYPE;

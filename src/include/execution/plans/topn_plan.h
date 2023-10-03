@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <bits/utility.h>
 #include <memory>
 #include <string>
 #include <utility>
@@ -19,8 +20,11 @@
 
 #include "binder/bound_order_by.h"
 #include "catalog/catalog.h"
+#include "common/macros.h"
+#include "execution/executors/abstract_executor.h"
 #include "execution/expressions/abstract_expression.h"
 #include "execution/plans/abstract_plan.h"
+#include "storage/table/tuple.h"
 
 namespace bustub {
 

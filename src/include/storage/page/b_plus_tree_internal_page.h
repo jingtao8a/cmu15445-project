@@ -45,34 +45,23 @@ class BPlusTreeInternalPage : public BPlusTreePage {
    * the creation of a new page to make a valid BPlusTreeInternalPage
    * @param max_size Maximal size of the page
    */
-  void Init(int max_size = INTERNAL_PAGE_SIZE);
+  void Init(int max_size = INTERNAL_PAGE_SIZE, int size = 1);
 
-  /**
-   * @param index The index of the key to get. Index must be non-zero.
-   * @return Key at index
-   */
-  auto KeyAt(int index) const -> KeyType;
+  auto GetArray() const -> MappingType * { return array_; }
 
-  /**
-   *
-   * @param index The index of the key to set. Index must be non-zero.
-   * @param key The new value for key
-   */
-  void SetKeyAt(int index, const KeyType &key);
+  auto KeyAt(int index) const -> KeyType { return array_[index].first; }
 
-  /**
-   *
-   * @param value the value to search for
-   */
+  void SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
+
+  auto ValueAt(int index) const -> ValueType { return array_[index].second; }
+
+  void SetValueAt(int index, const ValueType &value) { array_[index].second = value; }
+
   auto ValueIndex(const ValueType &value) const -> int;
 
-  /**
-   *
-   * @param index the index
-   * @return the value at the index
-   */
-  auto ValueAt(int index) const -> ValueType;
+  auto LookUp(const KeyType &key, const KeyComparator &comparator) const -> ValueType;
 
+  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
   /**
    * @brief For test only, return a string representing all keys in
    * this internal page, formatted as "(key1,key2,key3,...)"
@@ -101,6 +90,6 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
  private:
   // Flexible array member for page data.
-  MappingType array_[0];
+  mutable MappingType array_[0];
 };
 }  // namespace bustub

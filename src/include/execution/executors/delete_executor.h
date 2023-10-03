@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "catalog/catalog.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/delete_plan.h"
@@ -50,7 +51,7 @@ class DeleteExecutor : public AbstractExecutor {
    * NOTE: DeleteExecutor::Next() does not use the `rid` out-parameter.
    * NOTE: DeleteExecutor::Next() returns true with the number of deleted rows produced only once.
    */
-  auto Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool override;
+  auto Next(Tuple *tuple, RID *rid) -> bool override;
 
   /** @return The output schema for the delete */
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); };
@@ -60,5 +61,8 @@ class DeleteExecutor : public AbstractExecutor {
   const DeletePlanNode *plan_;
   /** The child executor from which RIDs for deleted tuples are pulled */
   std::unique_ptr<AbstractExecutor> child_executor_;
+  bool successful_;
+  TableInfo *table_info_;
+  std::vector<IndexInfo *> index_infos_;
 };
 }  // namespace bustub
